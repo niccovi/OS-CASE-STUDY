@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OS Simulator - Page Replacement</title>
+    <style>
+        /* minimal styling - plain, simple, no modern design */
+        body {
+            font-family: 'Courier New', monospace;
+            background: white;
+            margin: 20px;
+            color: black;
+        }
+        .container {
+            max-width: 1300px;
+            margin: 0 auto;
+            border: 1px solid #000;
+            padding: 15px;
+        }
+        h1 {
+            font-size: 1.5rem;
+            font-weight: bold;
+            margin: 0 0 5px 0;
+            padding: 0;
+            border-bottom: 1px solid black;
+        }
+        h2 {
+            font-size: 1.2rem;
+            font-weight: bold;
+            margin: 15px 0 5px 0;
+            border-bottom: 1px solid #888;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #aaa;
+            margin: 10px 0;
+        }
+        .input-panel {
+            border: 1px solid #aaa;
+            padding: 12px;
+            margin: 15px 0;
+            background: #f9f9f9;
+        }
+        .input-group {
+            margin-bottom: 10px;
+        }
+        label {
+            font-weight: bold;
+            display: inline-block;
+            width: 160px;
+            font-family: monospace;
+        }
+        input, select {
+            font-family: monospace;
+            padding: 4px 6px;
+            border: 1px solid #888;
+            background: white;
+            font-size: 0.9rem;
+        }
+        button {
+            font-family: monospace;
+            background: #e0e0e0;
+            border: 1px solid #666;
+            padding: 5px 12px;
+            margin-right: 8px;
+            cursor: pointer;
+            font-weight: normal;
+        }
+        button:hover {
+            background: #ccc;
+        }
+        .error-msg {
+            border: 1px solid #ff0000;
+            background: #ffeeee;
+            padding: 8px;
+            margin: 10px 0;
+            color: #cc0000;
+            font-family: monospace;
+        }
+        .stats {
+            border: 1px solid #666;
+            padding: 10px;
+            margin: 15px 0;
+            background: #f5f5f5;
+            font-family: monospace;
+        }
+        .stat-line {
+            margin: 4px 0;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-family: monospace;
+            font-size: 0.8rem;
+            margin: 10px 0;
+            border: 1px solid #333;
+        }
+        th {
+            border: 1px solid #333;
+            background: #ddd;
+            padding: 6px 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+        td {
+            border: 1px solid #888;
+            padding: 5px 3px;
+            text-align: center;
+        }
+        .fault-cell {
+            background: #ffcccc;
+            font-weight: bold;
+        }
+        .hit-cell {
+            background: #ccffcc;
+        }
+        .frame-state {
+            font-family: monospace;
+            font-weight: bold;
+        }
+        .legend {
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 0.75rem;
+            border: 1px solid #aaa;
+            padding: 6px;
+            background: #fafafa;
+        }
+        .legend span {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 1px solid #000;
+            margin-right: 5px;
+        }
+        footer {
+            margin-top: 20px;
+            border-top: 1px solid #aaa;
+            padding-top: 8px;
+            font-size: 0.7rem;
+            text-align: center;
+            font-family: monospace;
+        }
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>PAGE REPLACEMENT SIMULATOR</h1>
+    <p>FIFO | Optimal | LRU — Step-by-step table & page faults</p>
+    <hr>
+
+    <div class="input-panel">
+        <div class="input-group">
+            <label>Reference String:</label>
+            <input type="text" id="refStringInput" size="50" value="7 0 1 2 0 3 0 4 2 3 0 3 2">
+            <span style="font-size:0.7rem;"> (space or comma separated)</span>
+        </div>
+        <div class="input-group">
+            <label>Number of Frames:</label>
+            <input type="number" id="frameCount" min="1" max="10" value="3" style="width:70px;">
+        </div>
+        <div class="input-group">
+            <label>Algorithm:</label>
+            <select id="algorithmSelect">
+                <option value="FIFO">FIFO (First-In First-Out)</option>
+                <option value="OPTIMAL">Optimal (MIN)</option>
+                <option value="LRU">LRU (Least Recently Used)</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <button id="simulateBtn">RUN SIMULATION</button>
+            <button id="randomBtn">GENERATE RANDOM STRING</button>
+        </div>
+    </div>
+
+    <div id="errorMsg" class="error-msg" style="display:none;"></div>
+
+    <div id="statsPanel" class="stats" style="display:none;">
+        <!-- stats appear here -->
+    </div>
+
+    <div id="tableWrapper" class="table-wrapper" style="display:none;">
+        <table id="resultTable">
+            <thead id="tableHeader"></thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+
+    <div id="legendArea" class="legend" style="display:none;">
+        <div><span style="background:#ffcccc;"></span> Page Fault (red background)</div>
+        <div><span style="background:#ccffcc;"></span> Page Hit (green background)</div>
+        <div><span style="background:white;border:1px solid #888;"></span> Frame content (— = empty)</div>
+    </div>
+    <footer>
+        Plain-text simulator | FIFO, Optimal, LRU | Educational purpose only
+    </footer>
+</div>
+
+<script>
+    // ----- helper: parse reference string (spaces or commas)
+    function parseReferenceString(raw) {
+        let cleaned = raw.replace(/,/g, ' ');
+        let tokens = cleaned.trim().split(/\s+/);
+        let pages = [];
+        for (let t of tokens) {
+            if (t === "") continue;
+            let num = Number(t);
+            if (isNaN(num)) return { error: "Invalid number: '" + t + "'. Use integers only." };
+            pages.push(num);
+        }
+        if (pages.length === 0) return { error: "Reference string empty." };
+        return { pages };
+    }
+
+    // ----- FIFO implementation
+    function simulateFIFO(refList, frameCapacity) {
+        let frames = [];        
+        let steps = [];
+        let pageFaults = 0;
+        let pageHits = 0;
+
+        for (let i = 0; i < refList.length; i++) {
+            const page = refList[i];
+            const isHit = frames.includes(page);
+            let frameSnapshot = [...frames];
+            let faultOccurred = false;
+
+            if (!isHit) {
+                faultOccurred = true;
+                pageFaults++;
+                if (frames.length < frameCapacity) {
+                    frames.push(page);
+                } else {
+                    frames.shift();
+                    frames.push(page);
+                }
+                frameSnapshot = [...frames];
+            } else {
+                pageHits++;
+            }
+            steps.push({
+                ref: page,
+                frames: frameSnapshot.map(v => (v === undefined || v === null) ? "—" : v),
+                hit: !faultOccurred,
+                fault: faultOccurred
+            });
+        }
+        return { steps, totalFaults: pageFaults, totalHits: pageHits, hitRatio: (pageHits / refList.length).toFixed(4) };
+    }
+
+    // ----- OPTIMAL (looks forward)
+    function simulateOptimal(refList, frameCapacity) {
+        let frames = [];
+        let steps = [];
+        let pageFaults = 0;
+        let pageHits = 0;
+
+        for (let i = 0; i < refList.length; i++) {
+            const currentPage = refList[i];
+            const isHit = frames.includes(currentPage);
+            let frameSnapshot = [...frames];
+            let faultOccurred = false;
+
+            if (!isHit) {
+                faultOccurred = true;
+                pageFaults++;
+                if (frames.length < frameCapacity) {
+                    frames.push(currentPage);
+                } else {
+                    // find page to replace: furthest in future or never used again
+                    let farthestIdx = -1;
+                    let pageToReplace = frames[0];
+                    for (let f of frames) {
+                        let nextUse = Infinity;
+                        for (let j = i+1; j < refList.length; j++) {
+                            if (refList[j] === f) {
+                                nextUse = j;
+                                break;
+                            }
+                        }
+                        if (nextUse > farthestIdx) {
+                            farthestIdx = nextUse;
+                            pageToReplace = f;
+                        }
+                    }
+                    let pos = frames.indexOf(pageToReplace);
+                    if (pos !== -1) frames[pos] = currentPage;
+                    else frames[0] = currentPage;
+                }
+                frameSnapshot = [...frames];
+            } else {
+                pageHits++;
+            }
+            steps.push({
+                ref: currentPage,
+                frames: frameSnapshot.map(v => (v === undefined) ? "—" : v),
+                hit: !faultOccurred,
+                fault: faultOccurred
+            });
+        }
+        return { steps, totalFaults: pageFaults, totalHits: pageHits, hitRatio: (pageHits / refList.length).toFixed(4) };
+    }
+
+    // ----- LRU (using order list)
+    function simulateLRU(refList, frameCapacity) {
+        let frames = [];          // current pages in frames
+        let lruOrder = [];        // front = LRU, back = most recent
+        let steps = [];
+        let pageFaults = 0;
+        let pageHits = 0;
+
+        for (let i = 0; i < refList.length; i++) {
+            const page = refList[i];
+            const hitIndex = lruOrder.indexOf(page);
+            let faultOccurred = false;
+            let frameSnapshot = [];
+
+            if (hitIndex !== -1) {
+                // HIT: move to most recent
+                lruOrder.splice(hitIndex, 1);
+                lruOrder.push(page);
+                pageHits++;
+                frameSnapshot = [...frames];
+            } else {
+                faultOccurred = true;
+                pageFaults++;
+                if (frames.length < frameCapacity) {
+                    frames.push(page);
+                    lruOrder.push(page);
+                } else {
+                    // remove LRU (first in lruOrder)
+                    const lruPage = lruOrder.shift();
+                    const idxInFrames = frames.indexOf(lruPage);
+                    if (idxInFrames !== -1) frames[idxInFrames] = page;
+                    lruOrder.push(page);
+                }
+                // sync frames with lruOrder content
+                frames = [...lruOrder];
+                frameSnapshot = [...frames];
+            }
+            // ensure consistency
+            if (frames.length !== lruOrder.length || !frames.every(p => lruOrder.includes(p))) {
+                frames = [...lruOrder];
+                frameSnapshot = [...frames];
+            }
+            steps.push({
+                ref: page,
+                frames: frameSnapshot.map(v => (v === undefined) ? "—" : v),
+                hit: !faultOccurred,
+                fault: faultOccurred
+            });
+        }
+        return { steps, totalFaults: pageFaults, totalHits: pageHits, hitRatio: (pageHits / refList.length).toFixed(4) };
+    }
+
+    // ----- display simulation results
+    function runSimulation() {
+        const errorDiv = document.getElementById('errorMsg');
+        errorDiv.style.display = 'none';
+        errorDiv.innerHTML = '';
+
+        const rawRef = document.getElementById('refStringInput').value;
+        let frameCount = parseInt(document.getElementById('frameCount').value, 10);
+        const algorithm = document.getElementById('algorithmSelect').value;
+
+        if (isNaN(frameCount) || frameCount < 1) {
+            showError("Frame count must be a positive integer (>=1).");
+            return;
+        }
+        if (frameCount > 12) {
+            showError("Frame count max 12.");
+            return;
+        }
+
+        const parseResult = parseReferenceString(rawRef);
+        if (parseResult.error) {
+            showError(parseResult.error);
+            return;
+        }
+        let refList = parseResult.pages;
+        if (refList.length === 0) {
+            showError("Reference string is empty.");
+            return;
+        }
+
+        let simResult;
+        try {
+            if (algorithm === 'FIFO') {
+                simResult = simulateFIFO(refList, frameCount);
+            } else if (algorithm === 'OPTIMAL') {
+                simResult = simulateOptimal(refList, frameCount);
+            } else if (algorithm === 'LRU') {
+                simResult = simulateLRU(refList, frameCount);
+            } else {
+                showError("Unknown algorithm.");
+                return;
+            }
+        } catch(e) {
+            showError("Simulation error: " + e.message);
+            return;
+        }
+
+        // update stats panel (plain style)
+        const statsPanel = document.getElementById('statsPanel');
+        const totalFaults = simResult.totalFaults;
+        const totalHits = simResult.totalHits;
+        const totalRef = refList.length;
+        const hitPercent = (totalHits / totalRef * 100).toFixed(2);
+        statsPanel.style.display = 'block';
+        statsPanel.innerHTML = `
+            <div class="stat-line"><strong>PAGE FAULTS:</strong> ${totalFaults}</div>
+            <div class="stat-line"><strong>PAGE HITS:</strong> ${totalHits}</div>
+            <div class="stat-line"><strong>HIT RATIO:</strong> ${hitPercent}% (${totalHits}/${totalRef})</div>
+            <div class="stat-line"><strong>TOTAL REFERENCES:</strong> ${totalRef}</div>
+        `;
+
+        // build table
+        const steps = simResult.steps;
+        const numFrames = frameCount;
+        const thead = document.getElementById('tableHeader');
+        const tbody = document.getElementById('tableBody');
+        const tableWrapper = document.getElementById('tableWrapper');
+
+        // header
+        let headerHtml = '<tr>';
+        headerHtml += '<th>Step</th><th>Ref</th>';
+        for (let i=1; i<=numFrames; i++) {
+            headerHtml += `<th>F${i}</th>`;
+        }
+        headerHtml += '<th>Status</th></tr>';
+        thead.innerHTML = headerHtml;
+
+        let bodyHtml = '';
+        for (let idx=0; idx<steps.length; idx++) {
+            const s = steps[idx];
+            const framesState = s.frames;
+            const statusClass = s.fault ? 'fault-cell' : 'hit-cell';
+            const statusText = s.fault ? 'FAULT' : 'HIT';
+            bodyHtml += '<tr>';
+            bodyHtml += `<td>${idx+1}</td>`;
+            bodyHtml += `<td><strong>${s.ref}</strong></td>`;
+            for (let f=0; f<numFrames; f++) {
+                let val = (f < framesState.length && framesState[f] !== "—") ? framesState[f] : "—";
+                bodyHtml += `<td><span class="frame-state">${val}</span></td>`;
+            }
+            bodyHtml += `<td class="${statusClass}">${statusText}</td>`;
+            bodyHtml += '</tr>';
+        }
+        tbody.innerHTML = bodyHtml;
+        tableWrapper.style.display = 'block';
+        document.getElementById('legendArea').style.display = 'block';
+    }
+
+    function showError(msg) {
+        const errDiv = document.getElementById('errorMsg');
+        errDiv.innerHTML = msg;
+        errDiv.style.display = 'block';
+        document.getElementById('statsPanel').style.display = 'none';
+        document.getElementById('tableWrapper').style.display = 'none';
+        document.getElementById('legendArea').style.display = 'none';
+    }
+
+    // generate random reference string (pages 0-9, length 8 to 20)
+    function generateRandomString() {
+        const len = Math.floor(Math.random() * 14) + 8;  // 8-21
+        let arr = [];
+        for (let i=0; i<len; i++) {
+            arr.push(Math.floor(Math.random() * 10));
+        }
+        return arr.join(' ');
+    }
+
+    function setRandomAndRun() {
+        const randomStr = generateRandomString();
+        document.getElementById('refStringInput').value = randomStr;
+        runSimulation();
+    }
+
+    // attach event listeners
+    document.getElementById('simulateBtn').addEventListener('click', runSimulation);
+    document.getElementById('randomBtn').addEventListener('click', setRandomAndRun);
+
+    // initial run on page load
+    window.addEventListener('DOMContentLoaded', () => {
+        runSimulation();
+    });
+</script>
+</body>
+</html>
